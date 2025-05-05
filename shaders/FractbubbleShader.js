@@ -1,0 +1,108 @@
+import { ShaderComponent } from "./shader-component.js";
+
+const fragmentShader = `#version 300 es
+precision highp float;
+uniform vec2 iResolution;
+uniform float iTime;
+uniform vec2 iMouse;
+out vec4 fragColor;
+
+float PI = 3.14159265;
+
+mat3 RZ(float a) { float cosa = cos(a); float sina=sin(a); return mat3(cosa,sina,0,-sina,cosa,0,0,0,1); }
+float rand(vec2 co){ return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453); }
+
+float lenny(vec2 v)
+{
+  return abs(v.x)+abs(v.y);
+}
+float sat(float a)
+{
+  return clamp(a,0.0,1.0);
+}
+vec3 negate(vec3 col, bool yes)
+{
+  if (yes)
+     return vec3(1.)-col;
+  return col;
+}
+
+vec3 drawCir(vec2 uv, vec2 pos, float rad, float diag)
+{
+  uv = uv-pos;
+
+  float luv = mix(length(uv),lenny(uv),(0.5+0.5*sin(iTime))*diag);
+  float grad = (abs(luv - rad)/0.05);
+  vec3 col = (vec3(pow(sat(1.-grad),5.)));
+  float a = atan(uv.y,uv.x)/PI;
+  col += length(uv)/rad*float(length(uv)<rad);
+  return col;
+}
+
+vec3 rdrMain(vec2 uv)
+{
+  vec3 colGrad = vec3(0.45,0.34,0.78).yzx;
+  vec3 acc;
+
+  acc = mix(colGrad, vec3(0.3), 1.-length(uv));
+  acc *=min(pow(max(length(uv),0.1),3.5),1.);
+  return acc;
+}
+
+vec3 rdrCircles(vec2 uv)
+{
+  const int lines = 16;
+  vec3 acc = vec3(0.0);
+
+  for (int i = 0; i< lines;++i)
+  {
+    float fi = float(i);
+    vec2 pos= 1.*vec2(rand(vec2(fi*12., 8.-fi)), rand(vec2(mod(fi,0.5),fi)));
+    pos-= vec2(0.5);
+    pos-=pos;
+    float speed = 0.5;
+    pos -= max((fi/16.),0.1)*vec2(sin(speed*(iTime+fi)),cos(speed*(fi+iTime*(mod(fi,2.)<0.1?1.:-1.))));
+    acc += 0.5*drawCir(uv, pos,0.2*max(1.-pos.x,0.2),0.)*vec3(0.35+0.5*sin(iTime),0.05*fi+0.01,0.5+fi/16.).zyx;
+  }
+  return acc;
+}
+
+void main() {
+  vec2 fragCoord = gl_FragCoord.xy;
+  vec2 uv = fragCoord.xy / iResolution.xx;
+  vec2 center = vec2(0.5)*iResolution.xy/iResolution.xx;
+  uv = uv - center;
+  vec2 ouv = uv;
+  uv *= 4.0;
+
+  uv += mod((vec3(ouv,0.)*RZ(PI/4.)).xy*5., vec2(0.1));
+
+  vec3 col = rdrMain(uv);
+
+  col *= 1.-pow(length(uv),2.5);
+  col += rdrCircles(uv);
+  col +=rdrCircles(uv.yx*vec2(-1.,1.)*0.5);
+
+  if (col.z > 2.1)
+    col += vec3(0.5);
+
+  float luv = length(uv);
+    
+  col *= sat(pow(luv*2.,5.5)+0.2);
+    
+  if (luv < 0.3 && luv >0.15)
+    col *= vec3(pow(sat(uv.y+0.15),0.5));
+    
+  col += sat(1.-length(uv*0.5)) * 0.1;
+    
+  fragColor = vec4(col, 1.0);
+}`;
+
+class FractbubbleShader extends ShaderComponent {
+  constructor() {
+    super();
+    this.setFragmentShader(fragmentShader);
+  }
+}
+
+customElements.define("fractbubble-shader", FractbubbleShader);

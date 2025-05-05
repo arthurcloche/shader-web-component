@@ -1,0 +1,10 @@
+//MAGIC
+
+void mainImage(out vec4 O, vec2 I)
+{
+    O-=O;
+    for(vec2 i=vec2(0,-100),r=iResolution.xy; i.x<1e2;)
+    O += (cos(i.x*i.x/3e2+vec4(4,2,0,0))+1.)/
+    length(I+I-r-r*sin(iTime*cos(++i)))*
+    r.y*(.4+.6*texture(iChannel0,i/1e2).r)/1e2;
+}

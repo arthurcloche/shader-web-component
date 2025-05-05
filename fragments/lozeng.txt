@@ -1,0 +1,93 @@
+// https://www.shadertoy.com/view/ctyyz1 random lozenge tiling, 2023 by jt
+// based on https://www.shadertoy.com/view/cdcyRH hexagonally grouped triangles
+
+// Create a random lozenge tiling (isometric inside-outside cubes)
+// by tiling the plane into hexagons and filling each hexagon randomly
+// with either a cube or a corner (resp. 0 deg or 180 deg rotated lozenges).
+
+// NOTE: It is possible to create a domino tiling from a lozenge tiling
+//       https://www.shadertoy.com/view/mlGczD domino lozenge relation quantize
+//       but that quantize approach is limited to a subset of possible patterns.
+
+// Are there higher dimensional equivalents to the random lozenge tilings
+// (looking like 3d projections of hypercubes rather than 2d projections of cubes)?
+// Perhaps something like a 3d rhombic dodecahedral honeycomb (instead of the 2d hexagonal tiling),
+// dividing the rhombic dodecahedra into 3d parallelepipeds (instead of the hexagons into 2d lozenges)?
+
+// Found the keyword "corner polyhedra" to describe the general pattern -
+// which is apparently linked to rectangulations:
+// https://www.youtube.com/watch?v=gS3bJBRgAC0
+// "Fusy: Enumeration of Rectangulations and Corner Polyhedra - FPSAC 2023"
+// Intriguing but way over my head...
+
+// tags: triangle, cube, random, hexagon, isometric, tiling, out, in, inverted, corner, inside, outside, inout, lozenge, grouped
+
+// The MIT License
+// Copyright (c) 2023 Jakob Thomsen
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+// https://www.shadertoy.com/view/WttXWX "Best" Integer Hash by FabriceNeyret2,
+// implementing Chris Wellons https://nullprogram.com/blog/2018/07/31/
+int triple32(int x)
+{
+    x ^= x >> 17;
+    x *= 0xed5ad4bb;
+    x ^= x >> 11;
+    x *= 0xac4c1b51;
+    x ^= x >> 15;
+    x *= 0x31848bab;
+    x ^= x >> 14;
+    return x;
+}
+
+#define HASH(u) triple32(u)
+
+int hash(ivec3 v)
+{
+    return HASH(v.x + HASH(v.y + HASH(v.z + int(floor(iTime)))));
+}
+
+vec3 triangular(vec2 p) // via 3x3 matrix
+{
+/*
+    // full 3x3 matrix
+    mat3 M =
+        mat3
+        (
+            normalize(vec3(-1,-1,+2)),
+            normalize(vec3(+1,-1, 0)),
+            normalize(vec3(-1,-1,-1))
+        );
+    return M*vec3(p,0); // additionally rotate 90 degrees to align hexagonal coordinates with triangular coordinates
+    */
+    // essential 2x3 matrix (to triangular, with additional 90 degree rotation)
+    return mat2x3(normalize(vec3(-1,-1,+2)),normalize(vec3(+1,-1, 0)))*p;
+}
+
+// https://www.shadertoy.com/view/DtjyWD integer division - rounding down
+ivec3 div_floor(ivec3 a, int b) // vector version thanks to Fabrice
+{
+    ivec3  S = (sign(abs(a*b))-sign(a*b))/2; // 0 if a*b >= 0
+    return S * ((1 - abs(a)) / abs(b) - 1)+(1-S)*(a / b); // emulates ()?:
+}
+
+ivec3 mod_positive(ivec3 a, int b)
+{
+    return a - div_floor(a, b) * b;
+}
+
+ivec3 hexagonal(ivec3 i) // group triangular coordinates to hexagonal coordinates (jt)
+{
+    return div_floor(i.zxy-i.yzx,3);
+}
+
+void mainImage(out vec4 o, in vec2 p)
+{
+    vec2 R = iResolution.xy;
+    p = (2.0 * p - R) / R.y; // unit coordinates (keeping aspect ratio)
+    p *= 4.0*sqrt(6.0); // scale
+    vec3 b = triangular(p); // convert to barycentric coordinates
+    ivec3 t = ivec3(floor(b)); // quantize to triangle indices
+    ivec3 h = hexagonal(t); // group triangles to hexagons
+    o = vec4(equal(mod_positive(t.xyz-t.yzx,3),ivec3(1&hash(h))),1); // color-code lozenges / cube-sides (jt)
+}
